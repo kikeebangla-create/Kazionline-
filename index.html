@@ -127,6 +127,14 @@ main{padding:14px}
 .stats{grid-template-columns:1fr 1fr;gap:12px}.st{padding:16px}.st b{font-size:22px}
 .card{padding:14px;border-radius:16px}
 }
+.ig{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.igi{position:relative;width:92px;height:92px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.igi img{width:100%;height:100%;object-fit:cover}
+.igi button{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:12px}
+.igi em{position:absolute;left:0;right:0;bottom:0;background:rgba(109,40,217,.85);color:#fff;font-size:11px;text-align:center;font-style:normal;padding:2px}
+.subbox{margin:-2px 0 14px 22px;padding:10px;border-left:3px solid #d8d0f5;background:#faf8ff;border-radius:0 12px 12px 0}
+.sub-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px}
+.sub-row input{padding:9px;border:1px solid var(--line);border-radius:10px}
 </style>
 </head>
 <body>
@@ -218,8 +226,8 @@ $('#mod').onclick=e=>{if(e.target.id==='mod')closeModal()};
 function fld(f,v){
  const val=v===undefined?(f.def===undefined?'':f.def):v,n=`name="${f.k}"`,w=f.w?' w':'';
  if(f.t==='ta')return `<label class="f${w}"><span>${f.l}</span><textarea ${n} rows="${f.rows||3}" placeholder="${esc(f.ph||'')}">${esc(f.t2?val.join('\n'):val)}</textarea></label>`;
- if(f.t==='imgs')return `<label class="f w"><span>${f.l}</span><textarea ${n} rows="4" placeholder="প্রতি লাইনে একটি ইমেজ লিংক (সর্বোচ্চ ৪টি)">${esc((val||[]).join('\n'))}</textarea></label>`;
- if(f.t==='sel')return `<label class="f${w}"><span>${f.l}</span><select ${n}>${f.o.map(o=>`<option value="${esc(o[0])}" ${String(o[0])===String(val)?'selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`;
+  if(f.t==='imgs')return `<div class="f w" data-igw><span>${f.l}</span><textarea ${n} hidden>${esc((val||[]).join('\n'))}</textarea><div class="ig" data-ig></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center"><label class="btn" style="cursor:pointer">📷 গ্যালারি থেকে ছবি দিন<input type="file" accept="image/*" multiple hidden data-igf></label><input type="text" data-igu placeholder="অথবা ছবির লিংক পেস্ট করে Enter চাপুন" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px"></div></div>`;
+ if(f.t==='sel')return `<label class="f${w}"><span>${f.l}</span><select ${n}>${f.o.map(o=>`<option value="${esc(o[0])}" ${o[2]?`data-p="${esc(o[2])}"`:''} ${String(o[0])===String(val)?'selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`;
  if(f.t==='chk')return `<label class="f${w}"><span>${f.l}</span><input type="checkbox" ${n} ${val!==false&&val!==''&&val?'checked':''}></label>`;
  if(f.t==='dt'){const d=val?new Date(+val-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16):'';return `<label class="f${w}"><span>${f.l}</span><input type="datetime-local" ${n} value="${d}"></label>`}
  const ty={num:'number',col:'color',txt:'text',url:'url'}[f.t]||'text';
@@ -232,10 +240,30 @@ function rd(root,fs){
 }
 function editor(title,fs,item,onSave,pv){
  modal(`<h2>${title}</h2>${pv?'<div id="pv"></div>':''}<form id="ef"><div class="fg">${fs.map(f=>fld(f,item?item[f.k]:undefined)).join('')}</div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn" id="ec">বাতিল</button><button class="btn bp">💾 সেভ করুন</button></div></form>`);
- $('#ec').onclick=closeModal;
+ $('#ec').onclick=closeModal;wireImgs($('#ef'));wireSub($('#ef'));
  if(pv){const u=()=>{$('#pv').innerHTML=pv(rd($('#ef'),fs))};$('#ef').addEventListener('input',u);$('#ef').addEventListener('change',u);u()}
  $('#ef').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('.bp');b.disabled=true;try{await onSave(rd(e.target,fs));closeModal();toast('✅ সেভ হয়েছে')}catch(x){console.error(x);toast('❌ সেভ হয়নি: '+(x.code||x.message));b.disabled=false}};
 }
+const shrink=(file,max=900)=>new Promise((ok,no)=>{const r=new FileReader();r.onerror=no;r.onload=()=>{const im=new Image();im.onerror=no;im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),w=Math.round(im.width*k),h=Math.round(im.height*k),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);let q=.8,u=c.toDataURL('image/jpeg',q);while(u.length>160000&&q>.4){q-=.1;u=c.toDataURL('image/jpeg',q)}ok(u)};im.src=r.result};r.readAsDataURL(file)});
+const thumbOf=u=>new Promise(ok=>{const im=new Image();im.onerror=()=>ok('');im.onload=()=>{const k=Math.min(1,420/Math.max(im.width,im.height)),w=Math.round(im.width*k),h=Math.round(im.height*k),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);ok(c.toDataURL('image/jpeg',.72))};im.src=u});
+function wireImgs(root){
+ $$('[data-igw]',root).forEach(w=>{
+  const ta=$('textarea',w),box=$('[data-ig]',w);
+  const get=()=>ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  let draw;
+  const set=a=>{ta.value=a.slice(0,4).join('\n');draw()};
+  draw=()=>{box.innerHTML=get().map((u,i)=>`<div class="igi"><img src="${esc(u)}" alt=""><button type="button" data-x="${i}">✕</button>${i===0?'<em>মূল ছবি</em>':''}</div>`).join('')||'<small style="color:var(--mu)">এখনো কোনো ছবি নেই</small>';$$('[data-x]',box).forEach(b=>b.onclick=()=>{const a=get();a.splice(+b.dataset.x,1);set(a)})};
+  $('[data-igf]',w).onchange=async e=>{const fs=[...e.target.files];const a=get();for(const f of fs){if(a.length>=4){toast('সর্বোচ্চ ৪টি ছবি দেওয়া যাবে');break}try{a.push(await shrink(f))}catch(x){toast('ছবিটি পড়া যায়নি')}}e.target.value='';set(a)};
+  $('[data-igu]',w).onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const v=e.target.value.trim();if(!v)return;const a=get();if(a.length>=4)return toast('সর্বোচ্চ ৪টি ছবি');a.push(v);e.target.value='';set(a)}};
+  draw();
+ });
+}
+function wireSub(root){
+ const c=$('[name=category]',root),s=$('[name=subcategory]',root);if(!c||!s)return;
+ const f=()=>{[...s.options].forEach(o=>{const ok=!o.value||o.dataset.p===c.value;o.hidden=!ok;o.disabled=!ok});if(s.selectedOptions[0]&&s.selectedOptions[0].disabled)s.value=''};
+ c.addEventListener('change',f);f();
+}
+const subOpts=()=>[['','— নেই —'],...(D.settings.categories||[]).flatMap(c=>(c.subs||[]).map(s=>[s.id,c.name+' › '+s.name,c.id]))];
 const catOpts=()=>(D.settings.categories||[]).map(c=>[c.id,(c.icon||'')+' '+c.name]);
 
 /* ---------- dashboard ---------- */
@@ -256,13 +284,14 @@ function vDash(){
 const PF=()=>[
  {k:'name',l:'প্রডাক্টের নাম',w:1},
  {k:'category',l:'ক্যাটাগরি',t:'sel',o:catOpts()},
+ {k:'subcategory',l:'সাব ক্যাটাগরি (ঐচ্ছিক)',t:'sel',o:subOpts()},
  {k:'price',l:'মূল দাম (৳)',t:'num'},
  {k:'discount',l:'ছাড় (%)',t:'num',def:0},
  {k:'flatDiscount',l:'ফ্ল্যাট ডিসকাউন্ট (৳)',t:'num',def:0},
  {k:'stock',l:'স্টক সংখ্যা',t:'num',def:100},
  {k:'commissionType',l:'রেফার কমিশন ধরন',t:'sel',o:[['none','কমিশন নেই'],['percent','শতাংশ (%)'],['fixed','ফিক্সড টাকা (৳)']]},
  {k:'commissionValue',l:'কমিশন পরিমাণ',t:'num',def:0},
- {k:'images',l:'ইমেজ লিংক (৩/৪টি)',t:'imgs'},
+ {k:'images',l:'প্রডাক্টের ছবি (সর্বোচ্চ ৪টি — গ্যালারি থেকে আপলোড বা লিংক)',t:'imgs'},
  {k:'desc',l:'বিবরণ',t:'ta',rows:5,w:1},
  {k:'featured',l:'ফিচার্ড',t:'chk',def:false},
  {k:'active',l:'সাইটে দেখান',t:'chk',def:true}
@@ -275,14 +304,23 @@ function vProd(){
   $('#pt').innerHTML=l.map(p=>`<tr><td><img class="th" src="${esc((p.images||[])[0]||'')}" onerror="this.style.visibility='hidden'"></td><td><b>${esc(p.name)}</b><br><small style="color:var(--mu)">${esc(catName(p.category))}</small></td><td>${tk(p.price)}${(+p.discount>0||+p.flatDiscount>0)?`<br><small style="color:var(--ok)">ছাড়ের পর ${tk(fp(p))}${+p.discount>0?` (-${bn(p.discount)}%)`:''}</small>`:''}</td><td>${bn(p.stock??'—')}</td><td>${p.commissionType==='percent'?bn(p.commissionValue)+'%':p.commissionType==='fixed'?tk(p.commissionValue):'—'}</td><td><span class="pill ${p.active!==false?'on':'off'}">${p.active!==false?'চালু':'বন্ধ'}</span></td><td style="white-space:nowrap"><button class="btn bs" data-e="${p.id}">✏️</button> <button class="btn bs" data-tg="${p.id}">👁️</button> <button class="btn bs bd" data-d="${p.id}">🗑️</button></td></tr>`).join('')||'<tr><td colspan="7">কোনো প্রডাক্ট নেই</td></tr>';
   $$('[data-e]').forEach(b=>b.onclick=()=>edit(D.products.find(p=>p.id===b.dataset.e)));
   $$('[data-tg]').forEach(b=>b.onclick=async()=>{const p=D.products.find(x=>x.id===b.dataset.tg);p.active=p.active===false;await updateDoc(doc(db,'products',p.id),{active:p.active});draw()});
-  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('প্রডাক্ট মুছে ফেলবেন?'))return;await deleteDoc(doc(db,'products',b.dataset.d));D.products=D.products.filter(p=>p.id!==b.dataset.d);draw();toast('🗑️ মুছে ফেলা হয়েছে')});
+  $$('[data-d]').forEach(b=>b.onclick=async()=>{if(!confirm('প্রডাক্ট মুছে ফেলবেন?'))return;await deleteDoc(doc(db,'products',b.dataset.d));try{await deleteDoc(doc(db,'productImages',b.dataset.d))}catch(e){}D.products=D.products.filter(p=>p.id!==b.dataset.d);draw();toast('🗑️ মুছে ফেলা হয়েছে')});
  };
- const edit=p=>editor(p?'✏️ প্রডাক্ট এডিট':'➕ নতুন প্রডাক্ট',PF(),p,async v=>{
-  if(!v.name||!v.price)throw new Error('নাম ও দাম দিন');
-  if(p){await updateDoc(doc(db,'products',p.id),v);Object.assign(p,v)}
-  else{const r=await addDoc(collection(db,'products'),{...v,createdAt:serverTimestamp()});D.products.unshift({id:r.id,...v,createdAt:{seconds:Date.now()/1000}})}
-  draw();
- });
+  const edit=async p=>{
+   const it=p?{...p}:null;
+   if(p){let up=[];if(p.hasImgs){try{const d=await getDoc(doc(db,'productImages',p.id));up=d.exists()?(d.data().imgs||[]):[]}catch(e){}}it.images=[...up,...(p.images||[])]}
+   editor(p?'✏️ প্রডাক্ট এডিট':'➕ নতুন প্রডাক্ট',PF(),it,async v=>{
+    if(!v.name||!v.price)throw new Error('নাম ও দাম দিন');
+    const ups=v.images.filter(u=>u.startsWith('data:')),links=v.images.filter(u=>!u.startsWith('data:'));
+    v.images=links;v.hasImgs=ups.length>0;v.thumb=ups.length?await thumbOf(ups[0]):'';
+    if(v.subcategory){const c=(D.settings.categories||[]).find(c=>c.id===v.category);if(!c||!(c.subs||[]).some(s=>s.id===v.subcategory))v.subcategory=''}
+    let id=p&&p.id;
+    if(p){await updateDoc(doc(db,'products',id),v);Object.assign(p,v)}
+    else{const r=await addDoc(collection(db,'products'),{...v,createdAt:serverTimestamp()});id=r.id;D.products.unshift({id,...v,createdAt:{seconds:Date.now()/1000}})}
+    if(ups.length)await setDoc(doc(db,'productImages',id),{imgs:ups});else if(p){try{await deleteDoc(doc(db,'productImages',id))}catch(e){}}
+    draw();
+   });
+  };
  $('#content').innerHTML=`<div class="card"><div class="tb"><input id="ps" placeholder="🔍 নাম দিয়ে খুঁজুন"><select id="pc"><option value="">সব ক্যাটাগরি</option>${catOpts().map(o=>`<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select><span style="flex:1"></span><button class="btn" id="bulk">🏷️ ক্যাটাগরিতে বাল্ক ছাড়</button></div><div class="tw"><table><tr><th></th><th>প্রডাক্ট</th><th>দাম</th><th>স্টক</th><th>কমিশন</th><th>স্ট্যাটাস</th><th></th></tr><tbody id="pt"></tbody></table></div></div>`;
  $('#ps').oninput=draw;$('#pc').onchange=draw;$('#np').onclick=()=>edit(null);
  $('#bulk').onclick=()=>editor('🏷️ ক্যাটাগরির সব প্রডাক্টে ছাড় দিন',[{k:'cat',l:'ক্যাটাগরি',t:'sel',o:catOpts()},{k:'pct',l:'ছাড় (%) — ০ দিলে ছাড় বন্ধ',t:'num',def:10}],null,async v=>{const l=D.products.filter(p=>p.category===v.cat);if(!l.length)throw new Error('এই ক্যাটাগরিতে প্রডাক্ট নেই');const b=writeBatch(db);l.forEach(p=>{b.update(doc(db,'products',p.id),{discount:v.pct});p.discount=v.pct});await b.commit();draw()});
@@ -293,11 +331,19 @@ function vProd(){
 function vCat(){
  const cs=JSON.parse(JSON.stringify(D.settings.categories||[]));
  const draw=()=>{
-  $('#content').innerHTML=`<div class="card"><div class="note">ক্যাটাগরি আইডি অবশ্যই ইংরেজি ছোট হাতের অক্ষরে (যেমন: organic, electronics, fashion)। আইডি পরে বদলালে পুরনো প্রডাক্ট আলাদা হয়ে যাবে।</div>${cs.map((c,i)=>`<div class="cat-row"><input data-k="icon" data-i="${i}" value="${esc(c.icon||'')}" placeholder="ইমোজি"><input data-k="id" data-i="${i}" value="${esc(c.id)}" placeholder="আইডি (ইংরেজি)"><input data-k="name" data-i="${i}" value="${esc(c.name)}" placeholder="নাম (বাংলা)"><button class="btn bs bd" data-x="${i}">✕</button></div>`).join('')}<div style="display:flex;gap:10px;margin-top:10px"><button class="btn" id="ac">➕ নতুন ক্যাটাগরি</button><button class="btn bp" id="sc">💾 সেভ করুন</button></div></div>`;
+  $('#content').innerHTML=`<div class="card"><div class="note">ক্যাটাগরি ও সাব ক্যাটাগরির আইডি ইংরেজি ছোট হাতের অক্ষরে দিন (যেমন: organic, fruits)। সাব ক্যাটাগরির আইডি সব ক্যাটাগরি মিলিয়ে আলাদা (ইউনিক) হতে হবে। আইডি পরে বদলালে পুরনো প্রডাক্ট আলাদা হয়ে যাবে।</div>${cs.map((c,i)=>`<div class="cat-row"><input data-k="icon" data-i="${i}" value="${esc(c.icon||'')}" placeholder="ইমোজি"><input data-k="id" data-i="${i}" value="${esc(c.id)}" placeholder="আইডি (ইংরেজি)"><input data-k="name" data-i="${i}" value="${esc(c.name)}" placeholder="নাম (বাংলা)"><button class="btn bs bd" data-x="${i}">✕</button></div><div class="subbox">${(c.subs||[]).map((s,j)=>`<div class="sub-row"><input data-sk="id" data-i="${i}" data-j="${j}" value="${esc(s.id)}" placeholder="সাব আইডি (ইংরেজি)"><input data-sk="name" data-i="${i}" data-j="${j}" value="${esc(s.name)}" placeholder="সাব ক্যাটাগরির নাম (বাংলা)"><button class="btn bs bd" data-sx="${i}|${j}">✕</button></div>`).join('')}<button class="btn" data-sa="${i}">➕ সাব ক্যাটাগরি যোগ করুন</button></div>`).join('')}<div style="display:flex;gap:10px;margin-top:10px"><button class="btn" id="ac">➕ নতুন ক্যাটাগরি</button><button class="btn bp" id="sc">💾 সেভ করুন</button></div></div>`;
   $$('[data-k]').forEach(i=>i.oninput=()=>{cs[i.dataset.i][i.dataset.k]=i.value.trim()});
+  $$('[data-sk]').forEach(i=>i.oninput=()=>{cs[i.dataset.i].subs[i.dataset.j][i.dataset.sk]=i.value.trim()});
   $$('[data-x]').forEach(b=>b.onclick=()=>{cs.splice(b.dataset.x,1);draw()});
-  $('#ac').onclick=()=>{cs.push({id:'',name:'',icon:'📦'});draw()};
-  $('#sc').onclick=async()=>{const ids=cs.map(c=>c.id);if(cs.some(c=>!/^[a-z0-9-]+$/.test(c.id)||!c.name)||new Set(ids).size!==ids.length)return toast('আইডি ইংরেজি/ইউনিক ও নাম দিন');await setDoc(doc(db,'settings','main'),{categories:cs},{merge:true});D.settings.categories=cs;toast('✅ সেভ হয়েছে')};
+  $$('[data-sx]').forEach(b=>b.onclick=()=>{const [i,j]=b.dataset.sx.split('|');cs[i].subs.splice(j,1);draw()});
+  $$('[data-sa]').forEach(b=>b.onclick=()=>{const c=cs[b.dataset.sa];(c.subs=c.subs||[]).push({id:'',name:''});draw()});
+  $('#ac').onclick=()=>{cs.push({id:'',name:'',icon:'📦',subs:[]});draw()};
+  $('#sc').onclick=async()=>{
+   const ids=cs.map(c=>c.id),sids=cs.flatMap(c=>(c.subs||[]).map(s=>s.id));
+   if(cs.some(c=>!/^[a-z0-9-]+$/.test(c.id)||!c.name)||new Set(ids).size!==ids.length)return toast('ক্যাটাগরির আইডি ইংরেজি/ইউনিক ও নাম দিন');
+   if(cs.some(c=>(c.subs||[]).some(s=>!/^[a-z0-9-]+$/.test(s.id)||!s.name))||new Set(sids).size!==sids.length)return toast('সাব ক্যাটাগরির আইডি ইংরেজি/ইউনিক ও নাম দিন');
+   try{await setDoc(doc(db,'settings','main'),{categories:cs},{merge:true});D.settings.categories=cs;toast('✅ সেভ হয়েছে')}catch(x){toast('❌ '+(x.code||x.message))}
+  };
  };draw();
 }
 
